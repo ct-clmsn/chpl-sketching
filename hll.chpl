@@ -1,13 +1,13 @@
 module hll {
 
 /*
- * HyperLogLog implementation for Chapel
- * author: ct.clmsn
- *
- */
+  HyperLogLog implementation for Chapel
+  author: ct.clmsn
+*/
 
-use IO;
-
+/*
+ non-cryptographic hash function that was used for hash-based lookups
+*/
 proc murmur32(str:string, seed:uint(32)=0) {
    var membufstyle : iostyle;
    membufstyle.binary = 1;
@@ -82,6 +82,7 @@ proc murmur32(str:string, seed:uint(32)=0) {
    return hash;
 }
 
+/* */
 record HyperLogLog {
   var alpha:real;
   var p:int;
@@ -89,30 +90,7 @@ record HyperLogLog {
   var domM : domain(1) = {0..0};
   var M: [domM] int;
 
-  proc bit_length(x:?T) {
-    if T == uint(64) {
-      return 64;
-    }
-    if T == uint(32) {
-      return 32;
-    }
-    if T == uint(8) {
-      return 8;
-    }
-    if T == int(64) {
-      return 64;
-    }
-    if T == int(32) {
-      return 32;
-    }
-    if T == int(8){
-      return 8;
-    }
-
-    assert(false, "bit length unknown");
-    return -1;
-  }
-
+  /* */
   proc get_alpha(p:int) {
     assert(4 <= p && p <= 16, "p=" + p + " should be in range {4..16}");
     if p == 4 {
@@ -131,12 +109,13 @@ record HyperLogLog {
   //proc get_threshold(p) {
   //}
 
+  /* */
   proc _Ep() {
     var E = this.alpha * (m ** 2):real / (+ reduce [ i in this.M ] pow(2.0, -i:real));
     return if E <= (5*this.m):real then (E - estimate_bias(E, this.p)) else E;
   }
   proc get_rho(w, mx_width) {
-    var rho = mx_width - bit_length(w) + 1;
+    var rho = mx_width - numBits(w.type) + 1;
     if rho <= 0 {
       assert(false, "overflow!");
     }
@@ -144,6 +123,7 @@ record HyperLogLog {
     return rho;
   }
 
+  /* */
   proc add(val:string) {
     var x = murmur32(val, 0);
     var j = x & (this.m - 1);
@@ -151,6 +131,7 @@ record HyperLogLog {
     this.M(j) = max(this.M(j), get_rho(w, 64-this.p));
   }
 
+  /* */
   proc merge(hll:HyperLogLog) {
     assert(this.m == hll.m, "counter precision not equal");
 
@@ -186,14 +167,17 @@ record HyperLogLog {
     return _Ep();
   }*/
 
+  /* */
   proc linearcounting(e) {
     return this.m:real * log(this.m:real/e);
   }
 
+  /* */
   proc lagrange_correction(e) {
     return -(1<<32):real * log(1.0-e/(1<<32):real);
   }
 
+  /* */
   proc card() {
     var e = this.alpha * (this.m ** 2):real / (+ reduce [ m in this.M ] 2.0 ** -m );
     if e <= (5.0/2.0) * this.m:real {
@@ -207,10 +191,12 @@ record HyperLogLog {
     return lagrange_correction(e);
   }
 
+  /* */
   proc this() {
     return card();
   }
 
+  /* */
   proc HyperLogLog(error_rate:real) {
     const p = ceil(log(1.04/error_rate)):int;
     this.alpha = get_alpha(p);
@@ -220,17 +206,20 @@ record HyperLogLog {
     this.M = 0;
   }
 
-} // hyperloglog class terminate
+} // hyperloglog record terminate
 
+/* */
 proc +=(ref lhs:HyperLogLog, rhs:string) {
    lhs.add(rhs);
 }
 
+/* */
 proc +(ref lhs:HyperLogLog, rhs:HyperLogLog) {
    lhs.merge(rhs);
    return lhs;
 }
 
+/* */
 proc +=(ref lhs:HyperLogLog, rhs:HyperLogLog) {
    lhs.merge(rhs);
 }
